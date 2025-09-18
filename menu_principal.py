@@ -36,6 +36,8 @@ class MenuPrincipal:
         self.pet_coordinates = None
         self.last_pet_time = 0
         self.is_first_start = True
+        self.last_action_time = 0
+        self.next_pet_time = 0
         
     def get_primary_monitor_dimensions(self):
         """Retorna as dimensões e a posição do monitor principal usando screeninfo."""
@@ -196,17 +198,9 @@ class MenuPrincipal:
     
     def start_capture_timer_with_popup(self):
         """Inicia o timer com um pop-up para capturar as coordenadas."""
-        popup = tk.Toplevel(self.root)
-        popup.title("Configurar Clique")
-        popup.resizable(False, False)
-        
-        # Centraliza o popup
-        popup_width = 300
-        popup_height = 150
-        self.center_window_on_popup(popup, popup_width, popup_height)
-        
-        if messagebox.askokcancel("Configurar Clique", "Clique em OK para começar a configurar o ponto de clique.", parent=popup):
-            messagebox.showinfo("Captura de Ponto", "Coloque o mouse no local de clique.\nCapturando em 5 segundos...", parent=popup)
+        # Usa apenas messagebox para evitar janelas duplicadas
+        if messagebox.askokcancel("Configurar Clique", "Clique em OK para começar a configurar o ponto de clique."):
+            messagebox.showinfo("Captura de Ponto", "Coloque o mouse no local de clique.\nCapturando em 5 segundos...")
             
             print("Capturando ponto de clique em 5 segundos...")
             time.sleep(5)
@@ -214,19 +208,10 @@ class MenuPrincipal:
             mouse_x, mouse_y = pyautogui.position()
             print(f"Ponto de clique salvo: ({mouse_x}, {mouse_y})")
             
-            if messagebox.askokcancel("Ponto Salvo!", f"Ponto de clique salvo: ({mouse_x}, {mouse_y})\n\nClique em OK para iniciar a automação.", parent=popup):
-                popup.destroy()
+            if messagebox.askokcancel("Ponto Salvo!", f"Ponto de clique salvo: ({mouse_x}, {mouse_y})\n\nClique em OK para iniciar a automação."):
                 return mouse_x, mouse_y
         
-        popup.destroy()
         return None, None
-    
-    def center_window_on_popup(self, popup, width, height):
-        """Centraliza um popup no monitor principal."""
-        mon_width, mon_height, mon_x, mon_y = self.get_primary_monitor_dimensions()
-        x = mon_x + (mon_width // 2) - (width // 2)
-        y = mon_y + (mon_height // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{x}+{y}")
     
     def direcoes_aleatorias(self, num_direcoes=None):
         """Muda o personagem de direção de forma aleatória."""
@@ -278,6 +263,11 @@ class MenuPrincipal:
             numero_aleatorio = random.randint(183, 203)
             print(f'O tempo de espera será de {numero_aleatorio} segundos')
             
+            # Marca que estamos na fase de contagem de segundos
+            self.is_counting_seconds = True
+            # Atualiza o estado do botão Pausar para ficar ativo
+            self.update_pausar_button_state()
+            
             for j in range(numero_aleatorio):
                 if not self.hatching_is_active:
                     break
@@ -285,6 +275,11 @@ class MenuPrincipal:
                 self.progress_label.config(text=f"Execução: {i + 1}/100 - Aguardando: {self.remaining_time}s")
                 print(f'faltam {self.remaining_time} segundos')
                 time.sleep(1)
+            
+            # Marca que saímos da fase de contagem de segundos
+            self.is_counting_seconds = False
+            # Atualiza o estado do botão Pausar para ficar inativo
+            self.update_pausar_button_state()
 
         if self.hatching_is_active:
             print("Todas as 100 repetições foram concluídas!")
@@ -413,13 +408,18 @@ class MenuPrincipal:
         self.paused_remaining_time = 0
         self.paused_total_wait = 0
         
-        # Atualiza o estado inicial do botão Retornar
+        # Variável para controlar quando o botão Pausar deve estar habilitado
+        self.is_counting_seconds = False
+        
+        # Atualiza o estado inicial dos botões
         self.update_retornar_button_state()
+        self.update_pausar_button_state()
     
     def retornar_ao_menu(self):
         """Retorna ao menu principal centralizando a janela."""
         self.current_script = None
         self.hatching_is_active = False
+        self.is_counting_seconds = False
         # Remove o atributo flutuante
         self.root.attributes('-topmost', False)
         # Limpa a janela e recria o menu
@@ -474,6 +474,29 @@ class MenuPrincipal:
         else:
             self.btn_retornar.config(state="disabled", bg="#95a5a6")
     
+    def update_pausar_button_state(self):
+        """Atualiza o estado visual do botão Pausar baseado nas regras definidas."""
+        current_text = self.btn_pausar_play.cget("text")
+        
+        # O botão só fica ativo se:
+        # 1. Estiver na fase de contagem de segundos (is_counting_seconds = True)
+        # 2. OU se estiver em pausa (para permitir retomar)
+        
+        if "Pausar" in current_text:
+            # Botão está em modo "Pausar"
+            if self.is_counting_seconds:
+                # Pode pausar - botão ativo
+                self.btn_pausar_play.config(state="normal", bg="#f39c12")
+            else:
+                # Não pode pausar - botão inativo
+                self.btn_pausar_play.config(state="disabled", bg="#95a5a6")
+        elif "Play" in current_text:
+            # Botão está em modo "Play" - sempre ativo para retomar
+            self.btn_pausar_play.config(state="normal", bg="#27ae60")
+        elif "Iniciar" in current_text:
+            # Botão está em modo "Iniciar" - sempre ativo para iniciar
+            self.btn_pausar_play.config(state="normal", bg="#27ae60")
+    
     def toggle_configurar_parar(self):
         """Alterna entre configurar e parar."""
         if not self.is_configured:
@@ -494,8 +517,9 @@ class MenuPrincipal:
                 )
                 self.status_label.config(text="Configurado! Clique em Iniciar para começar.")
                 self.progress_label.config(text="Progresso: 0/100")
-                # Atualiza o estado do botão Retornar
+                # Atualiza o estado dos botões
                 self.update_retornar_button_state()
+                self.update_pausar_button_state()
             else:
                 self.status_label.config(text="Configuração cancelada.")
         else:
@@ -514,9 +538,15 @@ class MenuPrincipal:
                 bg="#f39c12"
             )
             self.is_paused = False
-            # Atualiza o estado do botão Retornar
+            # Atualiza o estado dos botões
             self.update_retornar_button_state()
+            self.update_pausar_button_state()
         elif "Pausar" in current_text:
+            # Verifica se estamos na fase de contagem de segundos
+            if not self.is_counting_seconds:
+                print("⚠️ Pausar só é permitido durante a contagem de segundos!")
+                return
+            
             # Pausar
             self.pause_hatching()
             self.btn_pausar_play.config(
@@ -524,8 +554,9 @@ class MenuPrincipal:
                 bg="#27ae60"
             )
             self.is_paused = True
-            # Atualiza o estado do botão Retornar
+            # Atualiza o estado dos botões
             self.update_retornar_button_state()
+            self.update_pausar_button_state()
         elif "Play" in current_text:
             # Play - retomar
             self.resume_hatching()
@@ -534,8 +565,9 @@ class MenuPrincipal:
                 bg="#f39c12"
             )
             self.is_paused = False
-            # Atualiza o estado do botão Retornar
+            # Atualiza o estado dos botões
             self.update_retornar_button_state()
+            self.update_pausar_button_state()
     
     def start_rachar_ovos(self):
         """Inicia o processo de rachar ovos."""
@@ -554,9 +586,13 @@ class MenuPrincipal:
     def pause_hatching(self):
         """Pausa a automação de rachar ovos."""
         self.hatching_is_active = False
+        # Marca que saímos da fase de contagem de segundos
+        self.is_counting_seconds = False
         # Salva o estado exato onde foi pausada
         self.paused_execution = self.current_execution
         self.paused_remaining_time = self.remaining_time
+        # Atualiza o estado do botão Pausar
+        self.update_pausar_button_state()
         print("Automação pausada pelo usuário.")
         print(f"Estado salvo: Execução {self.paused_execution}, Tempo restante: {self.paused_remaining_time}s")
     
@@ -595,6 +631,11 @@ class MenuPrincipal:
             self.progress_label.config(text=f"Execução: {paused_execution}/100 - Aguardando: {paused_remaining_time}s")
             print(f"Continuando tempo de espera: {paused_remaining_time}s restantes")
             
+            # Marca que estamos na fase de contagem de segundos
+            self.is_counting_seconds = True
+            # Atualiza o estado do botão Pausar para ficar ativo
+            self.update_pausar_button_state()
+            
             # Continua o tempo de espera restante
             for j in range(paused_remaining_time):
                 if not self.hatching_is_active:
@@ -603,6 +644,11 @@ class MenuPrincipal:
                 self.progress_label.config(text=f"Execução: {paused_execution}/100 - Aguardando: {self.remaining_time}s")
                 print(f'faltam {self.remaining_time} segundos')
                 time.sleep(1)
+            
+            # Marca que saímos da fase de contagem de segundos
+            self.is_counting_seconds = False
+            # Atualiza o estado do botão Pausar para ficar inativo
+            self.update_pausar_button_state()
         
         # Continua com as próximas execuções
         for i in range(paused_execution, 100):
@@ -618,6 +664,11 @@ class MenuPrincipal:
             numero_aleatorio = random.randint(183, 203)
             print(f'O tempo de espera será de {numero_aleatorio} segundos')
             
+            # Marca que estamos na fase de contagem de segundos
+            self.is_counting_seconds = True
+            # Atualiza o estado do botão Pausar para ficar ativo
+            self.update_pausar_button_state()
+            
             for j in range(numero_aleatorio):
                 if not self.hatching_is_active:
                     break
@@ -625,6 +676,11 @@ class MenuPrincipal:
                 self.progress_label.config(text=f"Execução: {i + 1}/100 - Aguardando: {self.remaining_time}s")
                 print(f'faltam {self.remaining_time} segundos')
                 time.sleep(1)
+            
+            # Marca que saímos da fase de contagem de segundos
+            self.is_counting_seconds = False
+            # Atualiza o estado do botão Pausar para ficar inativo
+            self.update_pausar_button_state()
 
         if self.hatching_is_active:
             print("Todas as 100 repetições foram concluídas!")
@@ -669,6 +725,11 @@ class MenuPrincipal:
             numero_aleatorio = random.randint(183, 203)
             print(f'O tempo de espera será de {numero_aleatorio} segundos')
             
+            # Marca que estamos na fase de contagem de segundos
+            self.is_counting_seconds = True
+            # Atualiza o estado do botão Pausar para ficar ativo
+            self.update_pausar_button_state()
+            
             for j in range(numero_aleatorio):
                 if not self.hatching_is_active:
                     break
@@ -676,6 +737,11 @@ class MenuPrincipal:
                 self.progress_label.config(text=f"Execução: {i + 1}/100 - Aguardando: {self.remaining_time}s")
                 print(f'faltam {self.remaining_time} segundos')
                 time.sleep(1)
+            
+            # Marca que saímos da fase de contagem de segundos
+            self.is_counting_seconds = False
+            # Atualiza o estado do botão Pausar para ficar inativo
+            self.update_pausar_button_state()
 
         if self.hatching_is_active:
             print("Todas as 100 repetições foram concluídas!")
@@ -692,6 +758,7 @@ class MenuPrincipal:
         self.hatching_is_active = False
         self.is_configured = False
         self.is_paused = False
+        self.is_counting_seconds = False
         self.current_execution = 0
         self.remaining_time = 0
         
@@ -716,8 +783,9 @@ class MenuPrincipal:
         self.status_label.config(text="Aguardando configuração...")
         self.progress_label.config(text="Progresso: ---")
         
-        # Atualiza o estado do botão Retornar
+        # Atualiza o estado dos botões
         self.update_retornar_button_state()
+        self.update_pausar_button_state()
         
         print("Automação interrompida e resetada pelo usuário.")
     
@@ -820,96 +888,367 @@ class MenuPrincipal:
         print(f"'{fishing_key.upper()}' apertado e clique realizado em ({mouse_x}, {mouse_y}).")
     
     def create_pesca_interface(self):
-        """Cria a interface para o script de pesca."""
-        # Limpa a janela principal
+        """Cria a interface de pesca integrada seguindo o padrão do rachar ovos."""
+        self.current_script = "pesca"
+        
+        # Limpa a janela e recria o conteúdo
         for widget in self.root.winfo_children():
             widget.destroy()
         
-        # Cria nova interface
-        main_frame = tk.Frame(self.root, padx=20, pady=20)
-        main_frame.pack(expand=True, fill='both')
+        # Torna a janela flutuante
+        self.root.attributes('-topmost', True)
+        
+        # Posiciona no quadrante inferior esquerdo
+        self.position_window_bottom_left()
+        
+        # Frame principal
+        main_frame = tk.Frame(self.root, bg="#ecf0f1", padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Título
         title_label = tk.Label(
             main_frame, 
             text="🎣 Pesca Automática", 
             font=("Arial", 16, "bold"),
-            fg="#2c3e50"
+            fg="#2c3e50",
+            bg="#ecf0f1"
         )
         title_label.pack(pady=(0, 20))
         
         # Status
-        status_label = tk.Label(
+        self.status_label = tk.Label(
             main_frame,
             text="Aguardando configuração...",
             font=("Arial", 12),
-            fg="#7f8c8d"
+            fg="#7f8c8d",
+            bg="#ecf0f1"
         )
-        status_label.pack(pady=(0, 10))
+        self.status_label.pack(pady=(0, 10))
         
-        # Informações
-        info_label = tk.Label(
+        # Progresso
+        self.progress_label = tk.Label(
             main_frame,
-            text="Configure as opções abaixo para iniciar a pesca automática",
+            text="Progresso: ---",
             font=("Arial", 10),
-            fg="#34495e"
+            fg="#34495e",
+            bg="#ecf0f1"
         )
-        info_label.pack(pady=(0, 20))
+        self.progress_label.pack(pady=(0, 20))
         
-        # Botões
-        buttons_frame = tk.Frame(main_frame)
+        # Botões principais
+        buttons_frame = tk.Frame(main_frame, bg="#ecf0f1")
         buttons_frame.pack(pady=20)
         
-        btn_configurar = tk.Button(
+        # Botão Configurar/Parar
+        self.btn_configurar_parar = tk.Button(
             buttons_frame,
-            text="⚙️ Configurar Pesca",
+            text="⚙️ Configurar",
             font=("Arial", 12, "bold"),
-            bg="#e74c3c",
+            bg="#3498db",
             fg="white",
             width=15,
             height=2,
-            command=lambda: self.start_pesca_config(status_label),
+            command=self.toggle_configurar_parar_pesca,
             cursor="hand2"
         )
-        btn_configurar.pack(side=tk.LEFT, padx=10)
+        self.btn_configurar_parar.pack(side=tk.LEFT, padx=10)
         
-        btn_voltar = tk.Button(
+        # Botão Pausar/Play
+        self.btn_pausar_play = tk.Button(
             buttons_frame,
-            text="🔙 Voltar ao Menu",
+            text="⏸️ Pausar",
             font=("Arial", 12, "bold"),
-            bg="#95a5a6",
+            bg="#f39c12",
+            fg="white",
+            width=15,
+            height=2,
+            command=self.toggle_pausar_play_pesca,
+            cursor="hand2",
+            state="disabled"
+        )
+        self.btn_pausar_play.pack(side=tk.LEFT, padx=10)
+        
+        # Botão Retornar (abaixo dos outros botões)
+        self.btn_retornar = tk.Button(
+            main_frame,
+            text="⬅️ Retornar",
+            font=("Arial", 12, "bold"),
+            bg="#9b59b6",
             fg="white",
             width=15,
             height=2,
             command=self.voltar_ao_menu,
-            cursor="hand2"
+            cursor="hand2",
+            state="disabled"
         )
-        btn_voltar.pack(side=tk.RIGHT, padx=10)
-    
-    def start_pesca_config(self, status_label):
-        """Inicia a configuração da pesca."""
-        status_label.config(text="Configurando pesca...")
+        self.btn_retornar.pack(pady=(20, 0))
         
-        # Configurações
+        # Variáveis de controle
+        self.is_configured_pesca = False
+        self.is_paused_pesca = False
+        self.fishing_thread = None
+        self.next_pet_time = 0
+        self.fishing_key = None
+        self.mouse_x = None
+        self.mouse_y = None
+        self.search_region = None
+        self.pet_coordinates = None
+        
+        # Atualiza o estado inicial do botão Retornar
+        self.update_retornar_button_state()
+    
+    def toggle_configurar_parar_pesca(self):
+        """Alterna entre configurar e parar na pesca."""
+        if not self.is_configured_pesca:
+            # Configurar
+            if self.start_pesca_config():
+                self.is_configured_pesca = True
+                self.btn_configurar_parar.config(
+                    text="⏹️ Parar",
+                    bg="#e74c3c"
+                )
+                self.btn_pausar_play.config(
+                    state="normal",
+                    text="▶️ Iniciar",
+                    bg="#27ae60"
+                )
+                self.status_label.config(text="Configurado! Clique em Iniciar para começar.")
+                self.progress_label.config(text="Progresso: Aguardando início")
+                self.update_retornar_button_state()
+            else:
+                self.status_label.config(text="Configuração cancelada.")
+        else:
+            # Parar
+            self.stop_fishing()
+    
+    def toggle_pausar_play_pesca(self):
+        """Alterna entre iniciar, pausar e play na pesca."""
+        current_text = self.btn_pausar_play.cget("text")
+        
+        if "Iniciar" in current_text:
+            # Primeira vez - iniciar automação
+            self.start_fishing()
+            self.btn_pausar_play.config(
+                text="⏸️ Pausar",
+                bg="#f39c12"
+            )
+            self.is_paused_pesca = False
+            self.update_retornar_button_state()
+        elif "Pausar" in current_text:
+            # Pausar
+            self.pause_fishing()
+            self.btn_pausar_play.config(
+                text="▶️ Play",
+                bg="#27ae60"
+            )
+            self.is_paused_pesca = True
+            self.update_retornar_button_state()
+        elif "Play" in current_text:
+            # Retomar
+            self.resume_fishing()
+            self.btn_pausar_play.config(
+                text="⏸️ Pausar",
+                bg="#f39c12"
+            )
+            self.is_paused_pesca = False
+            self.update_retornar_button_state()
+    
+    def start_pesca_config(self):
+        """Inicia o processo de configuração da pesca."""
+        # Configuração da tecla de pesca
         fishing_key = self.get_fishing_key()
         if not fishing_key:
-            status_label.config(text="Configuração cancelada.")
-            return
+            return False
             
+        # Configuração do carinho
         pet_coordinates = self.get_pet_coordinates()
         
+        # Configuração da região de busca
         search_region = self.get_exclamation_region()
         if not search_region:
-            status_label.config(text="Configuração cancelada.")
-            return
+            return False
             
+        # Configuração do ponto de clique
         mouse_x, mouse_y = self.get_fishing_click_coordinates()
         if mouse_x is None:
-            status_label.config(text="Configuração cancelada.")
+            return False
+        
+        # Salva as configurações
+        self.fishing_key = fishing_key
+        self.mouse_x = mouse_x
+        self.mouse_y = mouse_y
+        self.search_region = search_region
+        self.pet_coordinates = pet_coordinates
+        
+        return True
+    
+    def start_fishing(self):
+        """Inicia a automação de pesca."""
+        self.fishing_is_active = True
+        self.last_action_time = time.time()
+        self.next_pet_time = time.time() + 90  # Próximo carinho em 90 segundos
+        
+        self.status_label.config(text="Executando automação...")
+        
+        # Inicia a pesca primeiro
+        self.start_fishing_action(self.fishing_key, self.mouse_x, self.mouse_y)
+        
+        # Executa em uma thread separada
+        self.fishing_thread = threading.Thread(
+            target=self.run_fishing_automation,
+            args=(self.fishing_key, self.mouse_x, self.mouse_y, self.search_region)
+        )
+        self.fishing_thread.daemon = True
+        self.fishing_thread.start()
+    
+    def pause_fishing(self):
+        """Pausa a automação de pesca."""
+        self.fishing_is_active = False
+        self.status_label.config(text="Automação pausada pelo usuário.")
+    
+    def resume_fishing(self):
+        """Retoma a automação de pesca."""
+        self.fishing_is_active = True
+        self.last_action_time = time.time()
+        self.status_label.config(text="Executando automação...")
+        
+        # Reinicia a pesca
+        self.start_fishing_action(self.fishing_key, self.mouse_x, self.mouse_y)
+    
+    def stop_fishing(self):
+        """Para completamente a automação e reseta."""
+        self.fishing_is_active = False
+        self.is_configured_pesca = False
+        self.is_paused_pesca = False
+        
+        # Reset dos botões
+        self.btn_configurar_parar.config(
+            text="⚙️ Configurar",
+            bg="#3498db"
+        )
+        self.btn_pausar_play.config(
+            text="⏸️ Pausar",
+            bg="#f39c12",
+            state="disabled"
+        )
+        
+        # Reset dos labels
+        self.status_label.config(text="Aguardando configuração...")
+        self.progress_label.config(text="Progresso: ---")
+        
+        self.update_retornar_button_state()
+    
+    def run_fishing_automation(self, fishing_key, mouse_x, mouse_y, search_region):
+        """Executa a automação de pesca."""
+        # Inicia o monitoramento da tela
+        self.monitor_screen_and_react(search_region)
+        
+        # Inicia a atualização do progresso
+        self.update_fishing_progress()
+        
+        # Loop principal de carinho
+        while self.fishing_is_active:
+            current_time = time.time()
+            if current_time >= self.next_pet_time and self.pet_coordinates:
+                # Executa carinho apenas se foi configurado
+                pyautogui.click(self.pet_coordinates[0], self.pet_coordinates[1])
+                self.status_label.config(text="Executando carinho...")
+                time.sleep(1)
+                
+                # Define próximo carinho
+                self.next_pet_time = current_time + 90
+                self.status_label.config(text="Executando automação...")
+            
+            time.sleep(1)
+    
+    def monitor_screen_and_react(self, search_region):
+        """Monitora a tela e reage se a pesca estiver ativa."""
+        if not self.fishing_is_active:
             return
         
-        status_label.config(text="Pesca configurada! Use os controles para iniciar.")
-        messagebox.showinfo("Configuração Concluída", "Pesca automática configurada com sucesso!")
+        try:
+            # Captura a região de busca
+            screenshot = pyautogui.screenshot(region=search_region)
+            
+            # Verifica se a imagem existe
+            import os
+            if not os.path.exists('exclamacao-pesca-sem-fundo.png'):
+                print("Arquivo de imagem não encontrado: exclamacao-pesca-sem-fundo.png")
+                return
+            
+            # Procura pela imagem da exclamação
+            try:
+                exclamation_location = pyautogui.locate('exclamacao-pesca-sem-fundo.png', screenshot)
+                
+                if exclamation_location:
+                    print("Imagem da exclamação encontrada! Reagindo...")
+                    
+                    self.last_action_time = time.time()
+                    
+                    directions = ['up', 'down', 'left', 'right']
+                    if self.last_direction and self.last_direction in directions:
+                        directions.remove(self.last_direction)
+                    
+                    direction = random.choice(directions)
+                    self.last_direction = direction
+                    
+                    pyautogui.press(direction)
+                    time.sleep(1.9)
+                else:
+                    # Imagem não encontrada - comportamento normal
+                    if time.time() - self.last_action_time > 8:
+                        print("Timeout de 8 segundos alcançado. Reiniciando a pesca...")
+                        
+                        self.start_fishing_action(self.fishing_key, self.mouse_x, self.mouse_y)
+                        self.last_action_time = time.time()
+                        
+            except pyautogui.ImageNotFoundException:
+                # Imagem não encontrada - comportamento normal durante pesca
+                if time.time() - self.last_action_time > 8:
+                    print("Timeout de 8 segundos alcançado. Reiniciando a pesca...")
+                    
+                    self.start_fishing_action(self.fishing_key, self.mouse_x, self.mouse_y)
+                    self.last_action_time = time.time()
+            
+            # Agenda próxima verificação
+            if self.fishing_is_active:
+                self.root.after(100, lambda: self.monitor_screen_and_react(search_region))
+                
+        except Exception as e:
+            print(f"Erro no monitoramento: {e}")
+            import traceback
+            traceback.print_exc()
+            if self.fishing_is_active:
+                self.root.after(1000, lambda: self.monitor_screen_and_react(search_region))
+    
+    def update_fishing_progress(self):
+        """Atualiza o progresso com tempo para próximo carinho."""
+        # Só atualiza se a pesca estiver configurada (não parada)
+        if self.is_configured_pesca:
+            if self.pet_coordinates and self.next_pet_time > 0:
+                # Mostra progresso do carinho se foi configurado
+                remaining_time = max(0, int(self.next_pet_time - time.time()))
+                if remaining_time > 0:
+                    self.progress_label.config(text=f"Próximo carinho em: {remaining_time}s")
+                else:
+                    self.progress_label.config(text="Carinho disponível!")
+            elif self.fishing_is_active and not self.is_paused_pesca:
+                # Se carinho não foi configurado e pesca ativa (não pausada)
+                self.progress_label.config(text="Executando pesca...")
+            elif self.is_paused_pesca:
+                # Se pausada, mostra status pausado
+                if self.pet_coordinates and self.next_pet_time > 0:
+                    remaining_time = max(0, int(self.next_pet_time - time.time()))
+                    if remaining_time > 0:
+                        self.progress_label.config(text=f"Próximo carinho em: {remaining_time}s (Pausado)")
+                    else:
+                        self.progress_label.config(text="Carinho disponível! (Pausado)")
+                else:
+                    self.progress_label.config(text="Pesca pausada")
+            
+            # Agenda próxima atualização se ainda estiver configurado
+            if self.is_configured_pesca:
+                self.root.after(1000, self.update_fishing_progress)
     
     def run(self):
         """Inicia o loop principal da aplicação."""

@@ -2,6 +2,7 @@ import pyautogui
 import time
 import random
 import tkinter as tk
+import threading
 from tkinter import simpledialog, messagebox
 
 # Variáveis globais para controlar a execução do script de pesca e a última direção
@@ -9,6 +10,7 @@ fishing_is_active = False
 last_direction = None
 after_id_fishing = None
 after_id_pet = None
+last_action_time = 0
 
 # Variáveis globais para a nova funcionalidade de carinho
 pet_is_active = False
@@ -110,7 +112,7 @@ def get_fishing_click_coordinates(parent):
 
 # --- Funções de Automação ---
 
-def start_fishing_action(fishing_key, mouse_x, mouse_y):
+
     """Prepara o personagem e inicia a pesca."""
     global last_direction
     print("Iniciando a pesca...")
@@ -251,42 +253,288 @@ def exit_script(root):
     root.destroy()
     print("Aplicação encerrada.")
 
+def start_fishing_action(fishing_key, mouse_x, mouse_y):
+    """Prepara o personagem e inicia a pesca."""
+    global last_direction
+    
+    directions = ['up', 'down', 'left', 'right']
+    if last_direction and last_direction in directions:
+        directions.remove(last_direction)
+    
+    direction = random.choice(directions)
+    last_direction = direction
+    
+    pyautogui.press(direction)
+    time.sleep(0.5)
+    pyautogui.press(fishing_key)
+    time.sleep(0.5)
+    pyautogui.click(mouse_x, mouse_y)
+
 def create_control_window(fishing_key, mouse_x, mouse_y, search_region, image_file):
-    """Cria e exibe a janela de controle."""
+    """Cria e exibe a janela de controle seguindo o padrão do rachar ovos."""
     root = tk.Tk()
-    root.title("Controle de Pesca")
+    root.title("Menu Principal - Automação")
+    root.resizable(False, False)
     
+    # Define o tamanho da janela igual ao rachar ovos
+    window_width = 400
+    window_height = 300
+    
+    # Centraliza a janela no quadrante inferior esquerdo
     screen_width, screen_height = get_screen_dimensions()
-    root.geometry(f'+10+{screen_height - 100}')
+    quadrant_center_x = screen_width // 4
+    quadrant_center_y = screen_height * 3 // 4
+    x = quadrant_center_x - (window_width // 2)
+    y = quadrant_center_y - (window_height // 2)
+    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
     
+    # Torna a janela flutuante
     root.attributes('-topmost', True)
-
-    frame_info = tk.Frame(root, padx=10, pady=5)
-    frame_info.pack(fill=tk.X)
-
-    direction_label = tk.Label(frame_info, text="Direção: ---")
-    direction_label.pack(side=tk.LEFT, padx=5)
-
-    pet_label = tk.Label(frame_info, text="Carinho: ---")
-    pet_label.pack(side=tk.RIGHT, padx=5)
-
-    frame_buttons = tk.Frame(root, padx=10, pady=10)
-    frame_buttons.pack()
     
-    start_button = tk.Button(frame_buttons, text="Iniciar Pesca", relief="raised", command=lambda: start_script(root, fishing_key, mouse_x, mouse_y, search_region, image_file, start_button, stop_button, direction_label, pet_label))
-    start_button.pack(side=tk.LEFT, padx=5)
+    # Frame principal
+    main_frame = tk.Frame(root, bg="#ecf0f1", padx=20, pady=20)
+    main_frame.pack(fill=tk.BOTH, expand=True)
     
-    stop_button = tk.Button(frame_buttons, text="Parar Pesca", relief="raised", command=lambda: stop_script(root, start_button, stop_button, direction_label, pet_label))
-    stop_button.pack(side=tk.RIGHT, padx=5)
+    # Título
+    title_label = tk.Label(
+        main_frame, 
+        text="🎣 Pesca Automática", 
+        font=("Arial", 16, "bold"),
+        fg="#2c3e50",
+        bg="#ecf0f1"
+    )
+    title_label.pack(pady=(0, 20))
     
-    frame_exit = tk.Frame(root, pady=5)
-    frame_exit.pack()
+    # Status
+    status_label = tk.Label(
+        main_frame,
+        text="Aguardando configuração...",
+        font=("Arial", 12),
+        fg="#7f8c8d",
+        bg="#ecf0f1"
+    )
+    status_label.pack(pady=(0, 10))
     
-    exit_button = tk.Button(frame_exit, text="Sair", bg="red", fg="white", command=lambda: exit_script(root))
-    exit_button.pack(side=tk.BOTTOM, pady=5)
+    # Progresso
+    progress_label = tk.Label(
+        main_frame,
+        text="Progresso: ---",
+        font=("Arial", 10),
+        fg="#34495e",
+        bg="#ecf0f1"
+    )
+    progress_label.pack(pady=(0, 20))
     
-    pet_action_loop(root)
+    # Botões principais
+    buttons_frame = tk.Frame(main_frame, bg="#ecf0f1")
+    buttons_frame.pack(pady=20)
     
+    # Botão Configurar/Parar
+    btn_configurar_parar = tk.Button(
+        buttons_frame,
+        text="⚙️ Configurar",
+        font=("Arial", 12, "bold"),
+        bg="#3498db",
+        fg="white",
+        width=15,
+        height=2,
+        command=lambda: toggle_configurar_parar(),
+        cursor="hand2"
+    )
+    btn_configurar_parar.pack(side=tk.LEFT, padx=10)
+    
+    # Botão Pausar/Play
+    btn_pausar_play = tk.Button(
+        buttons_frame,
+        text="⏸️ Pausar",
+        font=("Arial", 12, "bold"),
+        bg="#f39c12",
+        fg="white",
+        width=15,
+        height=2,
+        command=lambda: toggle_pausar_play(),
+        cursor="hand2",
+        state="disabled"
+    )
+    btn_pausar_play.pack(side=tk.LEFT, padx=10)
+    
+    # Botão Retornar (abaixo dos outros botões)
+    btn_retornar = tk.Button(
+        main_frame,
+        text="⬅️ Retornar",
+        font=("Arial", 12, "bold"),
+        bg="#9b59b6",
+        fg="white",
+        width=15,
+        height=2,
+        command=lambda: voltar_ao_menu(),
+        cursor="hand2",
+        state="disabled"
+    )
+    btn_retornar.pack(pady=(20, 0))
+    
+    # Variáveis de controle
+    is_configured = False
+    is_paused = False
+    fishing_thread = None
+    next_pet_time = 0
+    
+    def toggle_configurar_parar():
+        nonlocal is_configured, is_paused
+        if not is_configured:
+            # Configurar
+            is_configured = True
+            btn_configurar_parar.config(
+                text="⏹️ Parar",
+                bg="#e74c3c"
+            )
+            btn_pausar_play.config(
+                state="normal",
+                text="▶️ Iniciar",
+                bg="#27ae60"
+            )
+            status_label.config(text="Configurado! Clique em Iniciar para começar.")
+            progress_label.config(text="Progresso: Aguardando início")
+            btn_retornar.config(state="disabled", bg="#95a5a6")
+        else:
+            # Parar
+            stop_fishing()
+    
+    def toggle_pausar_play():
+        nonlocal is_paused
+        current_text = btn_pausar_play.cget("text")
+        
+        if "Iniciar" in current_text:
+            # Primeira vez - iniciar automação
+            start_fishing()
+            btn_pausar_play.config(
+                text="⏸️ Pausar",
+                bg="#f39c12"
+            )
+            is_paused = False
+            btn_retornar.config(state="disabled", bg="#95a5a6")
+        elif "Pausar" in current_text:
+            # Pausar
+            pause_fishing()
+            btn_pausar_play.config(
+                text="▶️ Play",
+                bg="#27ae60"
+            )
+            is_paused = True
+            btn_retornar.config(state="disabled", bg="#95a5a6")
+        elif "Play" in current_text:
+            # Retomar
+            resume_fishing()
+            btn_pausar_play.config(
+                text="⏸️ Pausar",
+                bg="#f39c12"
+            )
+            is_paused = False
+            btn_retornar.config(state="disabled", bg="#95a5a6")
+    
+    def start_fishing():
+        """Inicia a automação de pesca."""
+        global fishing_is_active, last_action_time, next_pet_time
+        fishing_is_active = True
+        last_action_time = time.time()
+        next_pet_time = time.time() + 30  # Próximo carinho em 30 segundos
+        
+        status_label.config(text="Executando automação...")
+        
+        # Executa em uma thread separada
+        fishing_thread = threading.Thread(
+            target=run_fishing_automation,
+            args=(fishing_key, mouse_x, mouse_y, search_region, image_file)
+        )
+        fishing_thread.daemon = True
+        fishing_thread.start()
+    
+    def pause_fishing():
+        """Pausa a automação de pesca."""
+        global fishing_is_active
+        fishing_is_active = False
+        status_label.config(text="Automação pausada pelo usuário.")
+    
+    def resume_fishing():
+        """Retoma a automação de pesca."""
+        global fishing_is_active, last_action_time
+        fishing_is_active = True
+        last_action_time = time.time()
+        status_label.config(text="Executando automação...")
+        
+        # Reinicia a pesca
+        start_fishing_action(fishing_key, mouse_x, mouse_y)
+    
+    def stop_fishing():
+        """Para completamente a automação e reseta."""
+        global fishing_is_active, is_configured, is_paused
+        fishing_is_active = False
+        is_configured = False
+        is_paused = False
+        
+        # Reset dos botões
+        btn_configurar_parar.config(
+            text="⚙️ Configurar",
+            bg="#3498db"
+        )
+        btn_pausar_play.config(
+            text="⏸️ Pausar",
+            bg="#f39c12",
+            state="disabled"
+        )
+        
+        # Reset dos labels
+        status_label.config(text="Aguardando configuração...")
+        progress_label.config(text="Progresso: ---")
+        
+        btn_retornar.config(state="normal", bg="#9b59b6")
+    
+    def voltar_ao_menu():
+        """Volta ao menu principal."""
+        root.destroy()
+    
+    def update_progress():
+        """Atualiza o progresso com tempo para próximo carinho."""
+        global next_pet_time
+        if fishing_is_active and next_pet_time > 0:
+            remaining_time = max(0, int(next_pet_time - time.time()))
+            if remaining_time > 0:
+                progress_label.config(text=f"Próximo carinho em: {remaining_time}s")
+            else:
+                progress_label.config(text="Carinho disponível!")
+        elif fishing_is_active:
+            progress_label.config(text="Executando pesca...")
+        
+        if fishing_is_active:
+            root.after(1000, update_progress)
+    
+    def run_fishing_automation(fishing_key, mouse_x, mouse_y, search_region, image_file):
+        """Executa a automação de pesca."""
+        global fishing_is_active, next_pet_time
+        
+        # Inicia o monitoramento da tela
+        monitor_screen_and_react(root, image_file, mouse_x, mouse_y, fishing_key, search_region, status_label)
+        
+        # Inicia a atualização do progresso
+        update_progress()
+        
+        # Loop principal de carinho
+        while fishing_is_active:
+            current_time = time.time()
+            if current_time >= next_pet_time:
+                # Executa carinho
+                if pet_coordinates:
+                    pyautogui.click(pet_coordinates[0], pet_coordinates[1])
+                    status_label.config(text="Executando carinho...")
+                    time.sleep(1)
+                
+                # Define próximo carinho
+                next_pet_time = current_time + 30
+                status_label.config(text="Executando automação...")
+            
+            time.sleep(1)
+    
+    # Inicia o loop principal
     root.mainloop()
 
 if __name__ == "__main__":

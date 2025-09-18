@@ -123,13 +123,37 @@ Se você receber erros de módulos não encontrados:
 2. Execute: `pip install -r requirements.txt`
 3. Se ainda houver problemas, use: `pip install --upgrade pip`
 
+### Erro de Política de Execução do PowerShell (Windows)
+Se você receber o seguinte erro ao executar os scripts `.bat`:
+
+```
+& : O arquivo C:caminho\do\arquivo não pode ser carregado porque a execução de scripts foi desabilitada neste sistema. Para obter mais informações, 
+consulte about_Execution_Policies em https://go.microsoft.com/fwlink/?LinkID=135170.
+No linha:1 caractere:3
++ & C:caminho\do\arquivo
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ CategoryInfo          : ErrodeSegurança: (:) [], PSSecurityException
++ FullyQualifiedErrorId : UnauthorizedAccess
+```
+
+**Solução:**
+1. Abra o PowerShell **sem ser administrador**
+2. Execute o comando:
+   ```powershell
+   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+3. Confirme com `Y` quando solicitado
+4. Agora você pode executar os scripts `.bat` normalmente
+
+**Nota:** Este comando permite a execução de scripts assinados remotamente apenas para o usuário atual, mantendo a segurança do sistema.
+
 ## 📁 Estrutura do Projeto
 
 ```
 autoclicker-2.0/
 ├── menu_principal.py      # Menu principal integrado
 ├── rachar_egg.py          # Script de rachar ovos com controle flutuante
-├── teste2-pesca.py        # Script de pesca com controle flutuante
+├── pesca.py               # Script de pesca com controle flutuante
 ├── requirements.txt        # Dependências do projeto
 ├── start_windows.bat      # Setup completo Windows (mantém venv ativo)
 ├── start_linux.sh         # Setup completo Linux (mantém venv ativo)
@@ -147,7 +171,7 @@ autoclicker-2.0/
 3. Configure o ponto de clique quando solicitado
 4. Use a janela de controle flutuante para:
    - Acompanhar o progresso em tempo real
-   - Pausar/retomar a automação quando necessário
+   - Pausar/retomar a automação quando necessário (o sistema de pausa funciona apenas quando os segundos entre uma execução e outra estão sendo contados)
    - Parar completamente se necessário
 5. Aguarde a conclusão das 100 execuções
 
