@@ -77,7 +77,7 @@ class MenuPrincipal:
         
         # Centraliza a janela
         window_width = 400
-        window_height = 300
+        window_height = 400
         self.center_window(window_width, window_height)
         
         # Configura o ícone da janela (opcional)
@@ -146,6 +146,22 @@ class MenuPrincipal:
         )
         btn_pesca.pack(pady=10)
         
+        # Botão Parar Script
+        btn_parar = tk.Button(
+            buttons_frame,
+            text="⏹️ Parar Script",
+            font=("Arial", 10),
+            bg="#f39c12",
+            fg="white",
+            width=15,
+            height=1,
+            relief="raised",
+            bd=2,
+            command=self.parar_script_atual,
+            cursor="hand2"
+        )
+        btn_parar.pack(pady=(10, 0))
+        
         # Botão Sair
         btn_sair = tk.Button(
             buttons_frame,
@@ -172,26 +188,53 @@ class MenuPrincipal:
         info_label.pack(side="bottom", pady=(10, 0))
     
     def abrir_rachar_ovos(self):
-        """Abre o script de rachar ovos integrado."""
+        """Abre o script de rachar ovos."""
         if self.current_script:
             messagebox.showwarning("Aviso", "Já existe um script em execução. Pare o script atual antes de iniciar outro.")
             return
             
-        self.current_script = "rachar_ovos"
-        self.create_rachar_ovos_interface()
+        try:
+            # Executa o script rachar_egg.py como subprocesso
+            self.script_window = subprocess.Popen([sys.executable, "rachar_egg.py"])
+            self.current_script = "rachar_ovos"
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao iniciar o script de rachar ovos: {e}")
     
     def abrir_pesca(self):
-        """Abre o script de pesca automática integrado."""
+        """Abre o script de pesca automática."""
         if self.current_script:
             messagebox.showwarning("Aviso", "Já existe um script em execução. Pare o script atual antes de iniciar outro.")
             return
             
-        self.current_script = "pesca"
-        self.create_pesca_interface()
+        try:
+            # Executa o script pesca.py como subprocesso
+            self.script_window = subprocess.Popen([sys.executable, "pesca.py"])
+            self.current_script = "pesca"
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao iniciar o script de pesca: {e}")
+    
+    def parar_script_atual(self):
+        """Para o script atualmente em execução."""
+        if self.script_window:
+            try:
+                self.script_window.terminate()
+                self.script_window = None
+                self.current_script = None
+                messagebox.showinfo("Sucesso", "Script parado com sucesso!")
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao parar o script: {e}")
+        else:
+            messagebox.showwarning("Aviso", "Nenhum script em execução.")
     
     def sair_aplicacao(self):
         """Fecha a aplicação."""
         if messagebox.askokcancel("Sair", "Deseja realmente sair do Menu Principal?"):
+            # Para o script em execução se houver
+            if self.script_window:
+                try:
+                    self.script_window.terminate()
+                except:
+                    pass
             self.root.destroy()
     
     # === FUNÇÕES INTEGRADAS PARA RACHAR OVOS ===

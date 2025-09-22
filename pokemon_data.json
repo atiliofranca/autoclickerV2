@@ -1,0 +1,9 @@
+{
+  "dusknoir": {
+    "attacks": [
+      "F9",
+      "F11"
+    ],
+    "cooldown": 40
+  }
+}

@@ -148,9 +148,18 @@ def create_control_window(click_x, click_y):
     root = tk.Tk()
     root.title("Controle de Rachar Ovos")
     
-    # Posiciona a janela no canto superior direito
+    # Posiciona a janela no centro do quadrante inferior esquerdo
     screen_width, screen_height = get_primary_monitor_dimensions()[:2]
-    root.geometry(f'+{screen_width - 250}+10')
+    window_width = 250
+    window_height = 200
+    
+    # Calcula o centro do quadrante inferior esquerdo
+    quadrant_center_x = screen_width // 4
+    quadrant_center_y = screen_height * 3 // 4
+    x = quadrant_center_x - (window_width // 2)
+    y = quadrant_center_y - (window_height // 2)
+    
+    root.geometry(f'{window_width}x{window_height}+{x}+{y}')
     
     root.attributes('-topmost', True)
     root.resizable(False, False)

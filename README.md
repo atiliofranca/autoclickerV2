@@ -4,10 +4,16 @@ Sistema de automação integrado com interface gráfica centralizada para script
 
 ## 📋 Funcionalidades
 
-- **🥚 Rachar Ovos**: Automação para quebrar ovos com movimentos aleatórios
-- **🎣 Pesca Automática**: Sistema de pesca com detecção de imagem e reações automáticas
+- **🥚 Rachar Ovos**: Automação para quebrar ovos com movimentos aleatórios e janela de controle flutuante
+- **🎣 Pesca Automática**: Sistema completo de pesca com:
+  - Detecção de imagem e reações automáticas
+  - Sistema de carinho automático (a cada 100 segundos)
+  - Sistema de ataques de Pokémon com persistência
+  - Gerenciamento completo de Pokémon (cadastrar, editar, excluir, selecionar)
+  - Janela de controle flutuante
 - **🖥️ Interface Unificada**: Menu principal centralizado com navegação intuitiva
 - **⚙️ Configuração Automática**: Setup automático de ambiente virtual e dependências
+- **💾 Persistência de Dados**: Pokémon cadastrados são salvos automaticamente
 
 ## 🚀 Como Usar
 
@@ -83,10 +89,26 @@ python menu_principal.py
   - Botões para pausar, retomar e parar
 
 ### Pesca Automática
-- Configuração de tecla de atalho (F1-F12)
-- Detecção de imagem da exclamação
-- Reações automáticas com movimentos aleatórios
-- Sistema de carinho opcional para Pokémon durante a pesca
+- **Configuração Completa**:
+  - Tecla de atalho de pesca (F1-F12)
+  - Região de busca da exclamação
+  - Ponto de clique para lançar a isca
+  - Sistema de carinho opcional (a cada 100 segundos)
+- **Sistema de Pokémon**:
+  - Cadastro de até 4 ataques por Pokémon (F1-F12)
+  - Cooldown personalizado para cada Pokémon
+  - Persistência automática dos dados
+  - Gerenciamento completo (editar, excluir, selecionar)
+- **Automação Inteligente**:
+  - Detecção de imagem da exclamação
+  - Reações automáticas com movimentos aleatórios
+  - Reinício automático após timeout
+  - Execução de ataques de Pokémon no cooldown
+- **Janela de Controle Flutuante**:
+  - Status da automação em tempo real
+  - Contador de carinho
+  - Contador de ataques de Pokémon
+  - Botões para iniciar e parar
 
 ## ⚠️ Requisitos do Sistema
 

@@ -3,156 +3,320 @@ import time
 import random
 import tkinter as tk
 import threading
+import json
+import os
 from tkinter import simpledialog, messagebox
+from screeninfo import get_monitors
 
-# Variáveis globais para controlar a execução do script de pesca e a última direção
+# Variáveis globais para controle da aplicação
 fishing_is_active = False
 last_direction = None
+last_action_time = 0
+last_pet_time = 0
+last_attack_time = 0
+
+# Variáveis para configurações
+pokemon_attacks = {}
+pet_coordinates = None
+pet_is_active = False
+fishing_key = None
+search_region = None
+mouse_x = None
+mouse_y = None
+
+# Arquivo para persistência dos dados
+POKEMON_DATA_FILE = "pokemon_data.json"
+
+# Variáveis para controle de threads
 after_id_fishing = None
 after_id_pet = None
-last_action_time = 0
+after_id_attack = None
 
-# Variáveis globais para a nova funcionalidade de carinho
-pet_is_active = False
-pet_coordinates = None
-last_pet_time = 0
+def get_primary_monitor_dimensions():
+    """Retorna as dimensões e a posição do monitor principal usando screeninfo."""
+    for monitor in get_monitors():
+        if monitor.is_primary:
+            return monitor.width, monitor.height, monitor.x, monitor.y
+    monitor = get_monitors()[0]
+    return monitor.width, monitor.height, monitor.x, monitor.y
 
-# Variável para controlar o início do script
-is_first_start = True
-
-def get_screen_dimensions():
-    """Retorna as dimensões do monitor principal."""
-    return pyautogui.size()
+def center_on_primary(window, width, height):
+    """Centraliza uma janela no monitor principal."""
+    mon_width, mon_height, mon_x, mon_y = get_primary_monitor_dimensions()
+    x = mon_x + (mon_width // 2) - (width // 2)
+    y = mon_y + (mon_height // 2) - (height // 2)
+    window.geometry(f"{width}x{height}+{x}+{y}")
 
 def create_centered_parent_window():
-    """
-    Cria uma janela real, centraliza e a mantém invisível para usar como pai dos pop-ups.
-    Isso força o SO a posicionar os pop-ups corretamente.
-    """
+    """Cria uma janela invisível para usar como pai dos pop-ups."""
     root = tk.Tk()
     root.title("")
     root.geometry("1x1")
-    root.attributes('-alpha', 0)  # Torna a janela invisível
-    
-    screen_width, screen_height = get_screen_dimensions()
-    x = (screen_width // 2)
-    y = (screen_height // 2)
-    root.geometry(f'+{x}+{y}')
+    root.attributes('-alpha', 0)
+    center_on_primary(root, 1, 1)
     root.update()
-    
     return root
 
-# --- Funções de Configuração ---
+def load_pokemon_data():
+    """Carrega os dados dos Pokémon salvos do arquivo JSON."""
+    global pokemon_attacks
+    try:
+        if os.path.exists(POKEMON_DATA_FILE):
+            with open(POKEMON_DATA_FILE, 'r', encoding='utf-8') as f:
+                pokemon_attacks = json.load(f)
+            print(f"Dados de {len(pokemon_attacks)} Pokémon carregados.")
+        else:
+            pokemon_attacks = {}
+            print("Nenhum Pokémon salvo encontrado.")
+    except Exception as e:
+        print(f"Erro ao carregar dados dos Pokémon: {e}")
+        pokemon_attacks = {}
 
-def get_fishing_key(parent):
-    """Pede ao usuário para escolher a tecla de atalho de pesca."""
-    keys = [f'F{i}' for i in range(1, 13)]
-    message = "Escolha a tecla de atalho para pesca (F1 a F12)."
+def save_pokemon_data():
+    """Salva os dados dos Pokémon no arquivo JSON."""
+    try:
+        with open(POKEMON_DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(pokemon_attacks, f, ensure_ascii=False, indent=2)
+        print("Dados dos Pokémon salvos com sucesso.")
+    except Exception as e:
+        print(f"Erro ao salvar dados dos Pokémon: {e}")
+
+def edit_pokemon(pokemon_name, parent):
+    """Edita um Pokémon existente."""
+    global pokemon_attacks
     
-    user_key = simpledialog.askstring("Tecla de Atalho", message, parent=parent)
+    if pokemon_name not in pokemon_attacks:
+        messagebox.showerror("Erro", "Pokémon não encontrado!", parent=parent)
+        return
+    
+    current_data = pokemon_attacks[pokemon_name]
+    
+    # Mostra dados atuais
+    current_attacks = ', '.join(current_data['attacks'])
+    messagebox.showinfo("Dados Atuais", 
+        f"Pokémon: {pokemon_name}\nAtaques: {current_attacks}\nCooldown: {current_data['cooldown']}s", 
+        parent=parent)
+    
+    # Pergunta o que editar
+    edit_choice = messagebox.askyesnocancel("Editar Pokémon", 
+        "Escolha o que editar:\n\nSim = Editar ataques\nNão = Editar cooldown\nCancelar = Renomear Pokémon", 
+        parent=parent)
+    
+    if edit_choice is None:  # Renomear
+        new_name = simpledialog.askstring("Renomear Pokémon", f"Novo nome para {pokemon_name}:", parent=parent)
+        if new_name and new_name != pokemon_name:
+            pokemon_attacks[new_name] = pokemon_attacks.pop(pokemon_name)
+            save_pokemon_data()
+            messagebox.showinfo("Sucesso", f"Pokémon renomeado para {new_name}!", parent=parent)
+    elif edit_choice:  # Editar ataques
+        attacks = []
+        for i in range(1, 5):
+            if i == 1:
+                key = simpledialog.askstring(f"Ataque {i}", f"Digite a tecla do ataque {i} (F1-F12):", parent=parent)
+            else:
+                key = simpledialog.askstring(f"Ataque {i} (Opcional)", f"Digite a tecla do ataque {i} (F1-F12) ou deixe vazio:", parent=parent)
+            
+            if key and key.upper() in [f'F{j}' for j in range(1, 13)]:
+                attacks.append(key.upper())
+            elif i == 1:
+                messagebox.showerror("Erro", "Pelo menos um ataque é obrigatório!", parent=parent)
+                return
+            else:
+                break
+        
+        if attacks:
+            pokemon_attacks[pokemon_name]['attacks'] = attacks
+            save_pokemon_data()
+            messagebox.showinfo("Sucesso", "Ataques atualizados!", parent=parent)
+    else:  # Editar cooldown
+        new_cooldown = simpledialog.askinteger("Editar Cooldown", 
+            f"Novo cooldown em segundos (atual: {current_data['cooldown']}s):", 
+            parent=parent, minvalue=1, maxvalue=3600)
+        if new_cooldown:
+            pokemon_attacks[pokemon_name]['cooldown'] = new_cooldown
+            save_pokemon_data()
+            messagebox.showinfo("Sucesso", f"Cooldown atualizado para {new_cooldown}s!", parent=parent)
+
+# --- Fase 1: Configuração Inicial ---
+
+def configure_pokemon_attacks(parent):
+    """Configura os ataques de Pokémon seguindo o XML."""
+    global pokemon_attacks
+    
+    if not messagebox.askyesno("Configuração de Pokémon", "Deseja configurar ataques de Pokémon?", parent=parent):
+        return True
+    
+    # Menu de opções
+    while True:
+        if pokemon_attacks:
+            choice = messagebox.askyesnocancel("Menu Pokémon", 
+                "Escolha uma opção:\n\nSim = Gerenciar Pokémon existente\nNão = Cadastrar novo Pokémon\nCancelar = Pular configuração", 
+                parent=parent)
+        else:
+            choice = messagebox.askyesnocancel("Menu Pokémon", 
+                "Escolha uma opção:\n\nSim = Cadastrar novo Pokémon\nNão = Pular configuração\nCancelar = Pular configuração", 
+                parent=parent)
+        
+        if choice is None:  # Cancelar
+            return True
+        elif choice:  # Gerenciar existente ou cadastrar novo
+            if pokemon_attacks:  # Se há Pokémon cadastrados, mostra menu de gerenciamento
+                manage_choice = messagebox.askyesnocancel("Gerenciar Pokémon", 
+                    "Escolha uma ação:\n\nSim = Escolher Pokémon\nNão = Editar Pokémon\nCancelar = Excluir Pokémon", 
+                    parent=parent)
+                
+                if manage_choice is None:  # Excluir
+                    pokemon_names = list(pokemon_attacks.keys())
+                    pokemon_name = simpledialog.askstring("Excluir Pokémon", 
+                        f"Digite o nome do Pokémon para excluir:\n{', '.join(pokemon_names)}", parent=parent)
+                    
+                    if pokemon_name and pokemon_name in pokemon_attacks:
+                        del pokemon_attacks[pokemon_name]
+                        save_pokemon_data()
+                        messagebox.showinfo("Sucesso", f"Pokémon {pokemon_name} excluído!", parent=parent)
+                        continue
+                elif manage_choice:  # Escolher
+                    pokemon_names = list(pokemon_attacks.keys())
+                    pokemon_name = simpledialog.askstring("Escolher Pokémon", 
+                        f"Digite o nome do Pokémon:\n{', '.join(pokemon_names)}", parent=parent)
+                    
+                    if pokemon_name and pokemon_name in pokemon_attacks:
+                        pokemon_attacks = {pokemon_name: pokemon_attacks[pokemon_name]}
+                        messagebox.showinfo("Sucesso", f"Pokémon {pokemon_name} selecionado!", parent=parent)
+                        return True
+                else:  # Editar
+                    pokemon_names = list(pokemon_attacks.keys())
+                    pokemon_name = simpledialog.askstring("Editar Pokémon", 
+                        f"Digite o nome do Pokémon para editar:\n{', '.join(pokemon_names)}", parent=parent)
+                    
+                    if pokemon_name and pokemon_name in pokemon_attacks:
+                        edit_pokemon(pokemon_name, parent)
+                        continue
+            else:  # Cadastrar novo
+                pass  # Continua para o código de cadastro
+        else:  # Pular configuração
+            return True
+        
+        # Se chegou aqui e não há Pokémon cadastrados, cadastra um novo
+        if not pokemon_attacks:
+            pokemon_name = simpledialog.askstring("Nome do Pokémon", "Digite o nome do Pokémon:", parent=parent)
+            if not pokemon_name:
+                continue
+                
+            # Coleta as teclas de atalho
+            attacks = []
+            for i in range(1, 5):
+                if i == 1:
+                    key = simpledialog.askstring(f"Ataque {i}", f"Digite a tecla do ataque {i} (F1-F12):", parent=parent)
+                else:
+                    key = simpledialog.askstring(f"Ataque {i} (Opcional)", f"Digite a tecla do ataque {i} (F1-F12) ou deixe vazio:", parent=parent)
+                
+                if key and key.upper() in [f'F{j}' for j in range(1, 13)]:
+                    attacks.append(key.upper())
+                elif i == 1:
+                    messagebox.showerror("Erro", "Pelo menos um ataque é obrigatório!", parent=parent)
+                    break
+                else:
+                    break
+            
+            if attacks:
+                cooldown = simpledialog.askinteger("Cooldown", "Digite o cooldown em segundos:", parent=parent, minvalue=1, maxvalue=3600)
+                if cooldown:
+                    pokemon_attacks[pokemon_name] = {
+                        'attacks': attacks,
+                        'cooldown': cooldown
+                    }
+                    save_pokemon_data()  # Salva os dados após cadastrar
+                    messagebox.showinfo("Sucesso", f"Pokémon {pokemon_name} cadastrado e salvo!", parent=parent)
+                    return True
+
+def configure_pet_coordinates(parent):
+    """Configura as coordenadas do carinho seguindo o XML."""
+    global pet_coordinates, pet_is_active
+    
+    if messagebox.askyesno("Configurar Carinho", "Deseja ativar a funcionalidade de carinho?", parent=parent):
+        pet_is_active = True
+        messagebox.showinfo("Captura de Ponto", "Posicione o mouse no ponto de clique de carinho.\nCapturando em 5 segundos...", parent=parent)
+        print("Capturando ponto de carinho em 5 segundos...")
+        time.sleep(5)
+            
+        pet_coordinates = pyautogui.position()
+        print(f"Ponto de carinho salvo: ({pet_coordinates.x}, {pet_coordinates.y})")
+        return True
+    else:
+        pet_is_active = False
+        return True
+
+def configure_fishing_key(parent):
+    """Configura a tecla de pesca seguindo o XML."""
+    global fishing_key
+    
+    keys = [f'F{i}' for i in range(1, 13)]
+    user_key = simpledialog.askstring("Tecla de Pesca", "Escolha a tecla de pesca (F1 a F12):", parent=parent)
     
     if user_key and user_key.upper() in keys:
-        print(f"Tecla de atalho salva: {user_key.upper()}")
-        return user_key.lower()
+        fishing_key = user_key.lower()
+        print(f"Tecla de pesca salva: {user_key.upper()}")
+        return True
     else:
-        messagebox.showerror("Erro", "Tecla de atalho inválida. Saindo do script.", parent=parent)
-        return None
+        messagebox.showerror("Erro", "Tecla inválida!", parent=parent)
+        return False
 
-def get_pet_coordinates(parent):
-    """Guia o usuário para definir as coordenadas do clique para dar carinho."""
-    global pet_is_active, pet_coordinates
+def configure_exclamation_region(parent):
+    """Configura a região de busca da exclamação seguindo o XML."""
+    global search_region
     
-    if messagebox.askyesno("Funcionalidade Opcional", "Deseja ativar a funcionalidade de 'dar carinho ao Pokémon' a cada 100 segundos?", parent=parent):
-        pet_is_active = True
+    messagebox.showinfo("Configurar Região", "Posicione o mouse no centro da exclamação para definir a área de busca.", parent=parent)
+    messagebox.showinfo("Captura de Região", "Capturando em 5 segundos...", parent=parent)
+    print("Capturando ponto central da região em 5 segundos...")
+    time.sleep(5)
         
-        if messagebox.askokcancel("Configurar Carinho", "Clique em OK e, em seguida, posicione o mouse no local exato onde o clique de carinho deve ocorrer.", parent=parent):
-            messagebox.showinfo("Captura de Ponto", "Capturando em 5 segundos...", parent=parent)
-            print("Capturando ponto de carinho em 5 segundos...")
-            time.sleep(5)
-            
-            pet_coordinates = pyautogui.position()
-            print(f"Ponto de carinho salvo: ({pet_coordinates.x}, {pet_coordinates.y})")
-            return pet_coordinates
+    center_x, center_y = pyautogui.position()
+    width = 100
+    height = 60
+        
+    left = center_x - width // 2
+    top = center_y - height // 2
+    search_region = (left, top, width, height)
     
-    pet_is_active = False
-    return None
+    print(f"Região de busca salva: {search_region}")
+    return True
 
-def get_exclamation_region(parent):
-    """Guia o usuário para definir o ponto central da região da exclamação."""
-    if messagebox.askokcancel("Configurar Região", "Agora vamos configurar a área de busca da exclamação.\n\nColoque o mouse no CENTRO do ícone da exclamação e clique em OK para continuar.", parent=parent):
-        messagebox.showinfo("Captura de Região", "Capturando em 5 segundos...", parent=parent)
-        print("Capturando ponto central da região em 5 segundos...")
-        time.sleep(5)
-        
-        center_x, center_y = pyautogui.position()
-        width = 100
-        height = 60
-        
-        left = center_x - width // 2
-        top = center_y - height // 2
-        region = (left, top, width, height)
-        
-        print(f"Região de busca salva: {region}")
-        return region
+def configure_fishing_click(parent):
+    """Configura o ponto de clique de pesca seguindo o XML."""
+    global mouse_x, mouse_y
     
-    return None
-
-def get_fishing_click_coordinates(parent):
-    """Pede ao usuário para posicionar o mouse e captura as coordenadas de clique de pesca."""
-    if messagebox.askokcancel("Configurar Clique", "Agora vamos configurar o ponto de clique de pesca.\n\nClique em OK para continuar.", parent=parent):
-        messagebox.showinfo("Captura de Ponto", "Colocando o mouse no local de clique de pesca.\nCapturando em 5 segundos...", parent=parent)
-        print("Capturando ponto de clique em 5 segundos...")
-        time.sleep(5)
+    messagebox.showinfo("Configurar Clique", "Posicione o mouse no ponto de clique para lançar a isca.", parent=parent)
+    messagebox.showinfo("Captura de Ponto", "Capturando em 5 segundos...", parent=parent)
+    print("Capturando ponto de clique em 5 segundos...")
+    time.sleep(5)
         
-        mouse_x, mouse_y = pyautogui.position()
-        print(f"Ponto de clique salvo: ({mouse_x}, {mouse_y})")
-        return mouse_x, mouse_y
-    
-    return None, None
+    mouse_x, mouse_y = pyautogui.position()
+    print(f"Ponto de clique salvo: ({mouse_x}, {mouse_y})")
+    return True
 
-# --- Funções de Automação ---
+# --- Fase 2 e 3: Execução e Funcionalidades Adicionais ---
 
-
+def start_fishing_action():
     """Prepara o personagem e inicia a pesca."""
-    global last_direction
-    print("Iniciando a pesca...")
+    global last_direction, last_action_time
     
+    print("Iniciando a pesca...")
     pyautogui.hotkey('ctrl', 'down')
     time.sleep(3)
     last_direction = 'down'
+    last_action_time = time.time()
 
-    pyautogui.click(x=mouse_x, y=mouse_y)
+    pyautogui.click(mouse_x, mouse_y)
     time.sleep(1)
     pyautogui.press(fishing_key)
     time.sleep(1) 
-    pyautogui.click(x=mouse_x, y=mouse_y)
+    pyautogui.click(mouse_x, mouse_y)
     print(f"'{fishing_key.upper()}' apertado e clique realizado em ({mouse_x}, {mouse_y}).")
 
-def update_pet_countdown(root, pet_label):
-    """Atualiza o contador de segundos para o próximo carinho."""
-    global pet_is_active, last_pet_time, after_id_pet
-
-    if pet_is_active:
-        seconds_left = max(0, 100 - (time.time() - last_pet_time))
-        pet_label.config(text=f"Carinho em: {int(seconds_left)}s")
-        after_id_pet = root.after(1000, lambda: update_pet_countdown(root, pet_label))
-    else:
-        pet_label.config(text="Carinho: Desativado")
-
-def pet_action_loop(root):
-    """Verifica e executa a ação de dar carinho."""
-    global pet_is_active, last_pet_time, pet_coordinates
-
-    if pet_is_active and (time.time() - last_pet_time) > 100:
-        print("Tempo de carinho alcançado. Dando carinho no Pokémon...")
-        pyautogui.click(x=pet_coordinates.x, y=pet_coordinates.y)
-        last_pet_time = time.time()
-    
-    root.after(1000, lambda: pet_action_loop(root))
-
-def monitor_screen_and_react(root, target_image_path, mouse_x, mouse_y, fishing_key, search_region, direction_label):
+def monitor_screen_and_react(root, target_image_path, direction_label):
     """Monitora a tela e reage se a pesca estiver ativa."""
-    global fishing_is_active, last_direction, after_id_fishing, last_action_time
+    global fishing_is_active, last_direction, last_action_time, after_id_fishing
 
     if not fishing_is_active:
         return
@@ -160,12 +324,19 @@ def monitor_screen_and_react(root, target_image_path, mouse_x, mouse_y, fishing_
     if last_direction:
         direction_label.config(text=f"Direção: {last_direction.capitalize()}")
     
+    # Verifica se passou tempo suficiente desde a última ação (1.9 segundos)
+    if time.time() - last_action_time < 1.9:
+        # Ainda está no período de delay, agenda próxima verificação
+        after_id_fishing = root.after(100, lambda: monitor_screen_and_react(root, target_image_path, direction_label))
+        return
+    
     try:
         exclamation_location = pyautogui.locateOnScreen(
             target_image_path,
-            confidence=0.8,
             region=search_region
         )
+    except pyautogui.ImageNotFoundException:
+        exclamation_location = None
     except Exception as e:
         print(f"Erro na detecção de imagem: {e}")
         exclamation_location = None
@@ -185,380 +356,219 @@ def monitor_screen_and_react(root, target_image_path, mouse_x, mouse_y, fishing_
         print(f"Pressionando Control + {selected_direction.capitalize()}...")
         pyautogui.hotkey('ctrl', selected_direction)
         
-        time.sleep(1.9)
+        # Atualiza o tempo da última ação para evitar múltiplas execuções
+        last_action_time = time.time()
     else:
         print("Imagem não encontrada. Aguardando...")
         if time.time() - last_action_time > 8:
             print("Timeout de 8 segundos alcançado. Reiniciando a pesca...")
-            
-            start_fishing_action(fishing_key, mouse_x, mouse_y)
-            last_action_time = time.time()
+            start_fishing_action()
 
-    after_id_fishing = root.after(100, lambda: monitor_screen_and_react(root, target_image_path, mouse_x, mouse_y, fishing_key, search_region, direction_label))
+    after_id_fishing = root.after(100, lambda: monitor_screen_and_react(root, target_image_path, direction_label))
 
-# --- Funções de Controle da Janela Principal ---
+def pet_action_loop(root):
+    """Loop de carinho seguindo o XML."""
+    global pet_is_active, last_pet_time, after_id_pet
 
-def start_script(root, fishing_key, mouse_x, mouse_y, search_region, image_file, start_button, stop_button, direction_label, pet_label):
-    """Inicia o script de pesca e a janela de controle."""
-    global fishing_is_active, last_direction, last_action_time, last_pet_time, is_first_start
-    
-    if fishing_is_active:
-        stop_script(root, start_button, stop_button, direction_label, pet_label)
-        
-    fishing_is_active = True
-    print("Script ativado.")
-    
-    start_button.config(relief="sunken")
-    stop_button.config(relief="raised")
-    
-    last_action_time = time.time()
-    last_direction = None
-    
-    if is_first_start:
+    if pet_is_active and pet_coordinates and (time.time() - last_pet_time) > 100:
+        print("Tempo de carinho alcançado. Dando carinho no Pokémon...")
+        pyautogui.click(pet_coordinates.x, pet_coordinates.y)
         last_pet_time = time.time()
-        root.after(0, lambda: pet_action_loop(root))
-        root.after(0, lambda: update_pet_countdown(root, pet_label))
-        is_first_start = False
     
-    time.sleep(1)
+    after_id_pet = root.after(1000, lambda: pet_action_loop(root))
+
+def pokemon_attack_loop(root):
+    """Loop de ataques de Pokémon seguindo o XML."""
+    global pokemon_attacks, last_attack_time, after_id_attack
+
+    if pokemon_attacks and (time.time() - last_attack_time) > min(attack['cooldown'] for attack in pokemon_attacks.values()):
+        for pokemon_name, pokemon_data in pokemon_attacks.items():
+            for attack_key in pokemon_data['attacks']:
+                pyautogui.press(attack_key)
+                time.sleep(0.5)
+        last_attack_time = time.time()
+        print("Ataques de Pokémon executados!")
     
-    start_fishing_action(fishing_key, mouse_x, mouse_y)
+    after_id_attack = root.after(1000, lambda: pokemon_attack_loop(root))
 
-    monitor_screen_and_react(root, image_file, mouse_x, mouse_y, fishing_key, search_region, direction_label)
-
-def stop_script(root, start_button, stop_button, direction_label, pet_label):
-    """Para o script de pesca."""
-    global fishing_is_active, after_id_fishing
+def update_counters(root, pet_label, attack_label):
+    """Atualiza os contadores da GUI seguindo o XML."""
+    global pet_is_active, pokemon_attacks, last_pet_time, last_attack_time, fishing_is_active
+    
+    # Só atualiza se a automação estiver ativa
     if fishing_is_active:
-        fishing_is_active = False
-        print("Script desativado.")
+        # Atualiza contador de carinho
+        if pet_is_active and pet_coordinates and last_pet_time > 0:
+            pet_remaining = max(0, 100 - (time.time() - last_pet_time))
+            pet_label.config(text=f"Carinho em: {int(pet_remaining)}s")
+        else:
+            pet_label.config(text="Carinho: Desativado")
         
-        stop_button.config(relief="sunken")
-        start_button.config(relief="raised")
-        
-        direction_label.config(text="Direção: ---")
-        
-        if after_id_fishing:
-            root.after_cancel(after_id_fishing)
-            after_id_fishing = None
-
-def exit_script(root):
-    """Fecha a janela e encerra a aplicação."""
-    global fishing_is_active, after_id_fishing, after_id_pet
-    fishing_is_active = False
-    if after_id_fishing:
-        root.after_cancel(after_id_fishing)
-    if after_id_pet:
-        root.after_cancel(after_id_pet)
-    root.destroy()
-    print("Aplicação encerrada.")
-
-def start_fishing_action(fishing_key, mouse_x, mouse_y):
-    """Prepara o personagem e inicia a pesca."""
-    global last_direction
+        # Atualiza contador de ataques
+        if pokemon_attacks and last_attack_time > 0:
+            min_cooldown = min(attack['cooldown'] for attack in pokemon_attacks.values())
+            attack_remaining = max(0, min_cooldown - (time.time() - last_attack_time))
+            attack_label.config(text=f"Ataque em: {int(attack_remaining)}s")
+        else:
+            attack_label.config(text="Ataque: Desativado")
     
-    directions = ['up', 'down', 'left', 'right']
-    if last_direction and last_direction in directions:
-        directions.remove(last_direction)
-    
-    direction = random.choice(directions)
-    last_direction = direction
-    
-    pyautogui.press(direction)
-    time.sleep(0.5)
-    pyautogui.press(fishing_key)
-    time.sleep(0.5)
-    pyautogui.click(mouse_x, mouse_y)
+    # SEMPRE agenda próxima atualização, independente do estado
+    # Isso garante que o contador continue funcionando mesmo durante timeouts
+    root.after(1000, lambda: update_counters(root, pet_label, attack_label))
 
-def create_control_window(fishing_key, mouse_x, mouse_y, search_region, image_file):
-    """Cria e exibe a janela de controle seguindo o padrão do rachar ovos."""
+# --- Fase 4: Controle de Estado ---
+
+def create_control_window():
+    """Cria e exibe a janela de controle seguindo o padrão do rachar_egg.py."""
+    global fishing_is_active, last_pet_time, last_attack_time, after_id_fishing, after_id_pet, after_id_attack
+    
     root = tk.Tk()
-    root.title("Menu Principal - Automação")
-    root.resizable(False, False)
+    root.title("Controle de Pesca Automática")
     
-    # Define o tamanho da janela igual ao rachar ovos
-    window_width = 400
-    window_height = 300
+    # Posiciona a janela no centro do quadrante inferior esquerdo
+    screen_width, screen_height = get_primary_monitor_dimensions()[:2]
+    window_width = 300
+    window_height = 250
     
-    # Centraliza a janela no quadrante inferior esquerdo
-    screen_width, screen_height = get_screen_dimensions()
+    # Calcula o centro do quadrante inferior esquerdo
     quadrant_center_x = screen_width // 4
     quadrant_center_y = screen_height * 3 // 4
     x = quadrant_center_x - (window_width // 2)
     y = quadrant_center_y - (window_height // 2)
-    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
     
-    # Torna a janela flutuante
+    root.geometry(f'{window_width}x{window_height}+{x}+{y}')
+    
     root.attributes('-topmost', True)
-    
+    root.resizable(False, False)
+
     # Frame principal
-    main_frame = tk.Frame(root, bg="#ecf0f1", padx=20, pady=20)
-    main_frame.pack(fill=tk.BOTH, expand=True)
-    
+    main_frame = tk.Frame(root, padx=10, pady=10)
+    main_frame.pack()
+
     # Título
-    title_label = tk.Label(
-        main_frame, 
-        text="🎣 Pesca Automática", 
-        font=("Arial", 16, "bold"),
-        fg="#2c3e50",
-        bg="#ecf0f1"
-    )
-    title_label.pack(pady=(0, 20))
-    
-    # Status
-    status_label = tk.Label(
-        main_frame,
-        text="Aguardando configuração...",
-        font=("Arial", 12),
-        fg="#7f8c8d",
-        bg="#ecf0f1"
-    )
-    status_label.pack(pady=(0, 10))
-    
-    # Progresso
-    progress_label = tk.Label(
-        main_frame,
-        text="Progresso: ---",
-        font=("Arial", 10),
-        fg="#34495e",
-        bg="#ecf0f1"
-    )
-    progress_label.pack(pady=(0, 20))
-    
-    # Botões principais
-    buttons_frame = tk.Frame(main_frame, bg="#ecf0f1")
-    buttons_frame.pack(pady=20)
-    
-    # Botão Configurar/Parar
-    btn_configurar_parar = tk.Button(
-        buttons_frame,
-        text="⚙️ Configurar",
-        font=("Arial", 12, "bold"),
-        bg="#3498db",
+    title_label = tk.Label(main_frame, text="🎣 Pesca Automática", font=("Arial", 12, "bold"))
+    title_label.pack(pady=(0, 10))
+
+    # Frame de informações
+    info_frame = tk.Frame(main_frame)
+    info_frame.pack(pady=5)
+
+    status_label = tk.Label(info_frame, text="Status: Aguardando", font=("Arial", 10))
+    status_label.pack()
+
+    direction_label = tk.Label(info_frame, text="Direção: ---", font=("Arial", 10))
+    direction_label.pack()
+
+    pet_label = tk.Label(info_frame, text="Carinho: Desativado", font=("Arial", 10))
+    pet_label.pack()
+
+    attack_label = tk.Label(info_frame, text="Ataque: Desativado", font=("Arial", 10))
+    attack_label.pack()
+
+    # Frame de botões
+    buttons_frame = tk.Frame(main_frame)
+    buttons_frame.pack(pady=10)
+
+    start_button = tk.Button(
+        buttons_frame, 
+        text="▶️ Começar", 
+        bg="#27ae60", 
         fg="white",
-        width=15,
-        height=2,
-        command=lambda: toggle_configurar_parar(),
-        cursor="hand2"
+        command=lambda: start_fishing(),
+        width=10
     )
-    btn_configurar_parar.pack(side=tk.LEFT, padx=10)
+    start_button.pack(side=tk.LEFT, padx=5)
     
-    # Botão Pausar/Play
-    btn_pausar_play = tk.Button(
-        buttons_frame,
-        text="⏸️ Pausar",
-        font=("Arial", 12, "bold"),
-        bg="#f39c12",
+    stop_button = tk.Button(
+        buttons_frame, 
+        text="⏹️ Parar", 
+        bg="#e74c3c", 
         fg="white",
-        width=15,
-        height=2,
-        command=lambda: toggle_pausar_play(),
-        cursor="hand2",
+        command=lambda: stop_fishing(root),
+        width=10,
         state="disabled"
     )
-    btn_pausar_play.pack(side=tk.LEFT, padx=10)
-    
-    # Botão Retornar (abaixo dos outros botões)
-    btn_retornar = tk.Button(
-        main_frame,
-        text="⬅️ Retornar",
-        font=("Arial", 12, "bold"),
-        bg="#9b59b6",
-        fg="white",
-        width=15,
-        height=2,
-        command=lambda: voltar_ao_menu(),
-        cursor="hand2",
-        state="disabled"
-    )
-    btn_retornar.pack(pady=(20, 0))
-    
-    # Variáveis de controle
-    is_configured = False
-    is_paused = False
-    fishing_thread = None
-    next_pet_time = 0
-    
-    def toggle_configurar_parar():
-        nonlocal is_configured, is_paused
-        if not is_configured:
-            # Configurar
-            is_configured = True
-            btn_configurar_parar.config(
-                text="⏹️ Parar",
-                bg="#e74c3c"
-            )
-            btn_pausar_play.config(
-                state="normal",
-                text="▶️ Iniciar",
-                bg="#27ae60"
-            )
-            status_label.config(text="Configurado! Clique em Iniciar para começar.")
-            progress_label.config(text="Progresso: Aguardando início")
-            btn_retornar.config(state="disabled", bg="#95a5a6")
-        else:
-            # Parar
-            stop_fishing()
-    
-    def toggle_pausar_play():
-        nonlocal is_paused
-        current_text = btn_pausar_play.cget("text")
-        
-        if "Iniciar" in current_text:
-            # Primeira vez - iniciar automação
-            start_fishing()
-            btn_pausar_play.config(
-                text="⏸️ Pausar",
-                bg="#f39c12"
-            )
-            is_paused = False
-            btn_retornar.config(state="disabled", bg="#95a5a6")
-        elif "Pausar" in current_text:
-            # Pausar
-            pause_fishing()
-            btn_pausar_play.config(
-                text="▶️ Play",
-                bg="#27ae60"
-            )
-            is_paused = True
-            btn_retornar.config(state="disabled", bg="#95a5a6")
-        elif "Play" in current_text:
-            # Retomar
-            resume_fishing()
-            btn_pausar_play.config(
-                text="⏸️ Pausar",
-                bg="#f39c12"
-            )
-            is_paused = False
-            btn_retornar.config(state="disabled", bg="#95a5a6")
-    
+    stop_button.pack(side=tk.LEFT, padx=5)
+
     def start_fishing():
         """Inicia a automação de pesca."""
-        global fishing_is_active, last_action_time, next_pet_time
+        global fishing_is_active, last_pet_time, last_attack_time
         fishing_is_active = True
-        last_action_time = time.time()
-        next_pet_time = time.time() + 30  # Próximo carinho em 30 segundos
+        last_pet_time = time.time()
+        last_attack_time = time.time()
         
-        status_label.config(text="Executando automação...")
+        status_label.config(text="Status: Executando")
+        start_button.config(state="disabled")
+        stop_button.config(state="normal")
         
-        # Executa em uma thread separada
-        fishing_thread = threading.Thread(
-            target=run_fishing_automation,
-            args=(fishing_key, mouse_x, mouse_y, search_region, image_file)
-        )
-        fishing_thread.daemon = True
-        fishing_thread.start()
-    
-    def pause_fishing():
-        """Pausa a automação de pesca."""
-        global fishing_is_active
+        # Inicia as threads
+        start_fishing_action()
+        monitor_screen_and_react(root, 'exclamacao-pesca-sem-fundo.png', direction_label)
+        pet_action_loop(root)
+        pokemon_attack_loop(root)
+        update_counters(root, pet_label, attack_label)
+
+    def stop_fishing(root):
+        """Para a automação de pesca."""
+        global fishing_is_active, after_id_fishing, after_id_pet, after_id_attack, last_pet_time, last_attack_time
         fishing_is_active = False
-        status_label.config(text="Automação pausada pelo usuário.")
+        
+        # Cancela todos os timers
+        if after_id_fishing:
+            root.after_cancel(after_id_fishing)
+            after_id_fishing = None
+        if after_id_pet:
+            root.after_cancel(after_id_pet)
+            after_id_pet = None
+        if after_id_attack:
+            root.after_cancel(after_id_attack)
+            after_id_attack = None
+        
+        # Zera os contadores
+        last_pet_time = 0
+        last_attack_time = 0
+        
+        # Atualiza a interface
+        status_label.config(text="Status: Parado")
+        direction_label.config(text="Direção: ---")
+        pet_label.config(text="Carinho: Desativado")
+        attack_label.config(text="Ataque: Desativado")
+        start_button.config(state="normal")
+        stop_button.config(state="disabled")
+        
+        print("Automação interrompida pelo usuário.")
     
-    def resume_fishing():
-        """Retoma a automação de pesca."""
-        global fishing_is_active, last_action_time
-        fishing_is_active = True
-        last_action_time = time.time()
-        status_label.config(text="Executando automação...")
-        
-        # Reinicia a pesca
-        start_fishing_action(fishing_key, mouse_x, mouse_y)
-    
-    def stop_fishing():
-        """Para completamente a automação e reseta."""
-        global fishing_is_active, is_configured, is_paused
-        fishing_is_active = False
-        is_configured = False
-        is_paused = False
-        
-        # Reset dos botões
-        btn_configurar_parar.config(
-            text="⚙️ Configurar",
-            bg="#3498db"
-        )
-        btn_pausar_play.config(
-            text="⏸️ Pausar",
-            bg="#f39c12",
-            state="disabled"
-        )
-        
-        # Reset dos labels
-        status_label.config(text="Aguardando configuração...")
-        progress_label.config(text="Progresso: ---")
-        
-        btn_retornar.config(state="normal", bg="#9b59b6")
-    
-    def voltar_ao_menu():
-        """Volta ao menu principal."""
-        root.destroy()
-    
-    def update_progress():
-        """Atualiza o progresso com tempo para próximo carinho."""
-        global next_pet_time
-        if fishing_is_active and next_pet_time > 0:
-            remaining_time = max(0, int(next_pet_time - time.time()))
-            if remaining_time > 0:
-                progress_label.config(text=f"Próximo carinho em: {remaining_time}s")
-            else:
-                progress_label.config(text="Carinho disponível!")
-        elif fishing_is_active:
-            progress_label.config(text="Executando pesca...")
-        
-        if fishing_is_active:
-            root.after(1000, update_progress)
-    
-    def run_fishing_automation(fishing_key, mouse_x, mouse_y, search_region, image_file):
-        """Executa a automação de pesca."""
-        global fishing_is_active, next_pet_time
-        
-        # Inicia o monitoramento da tela
-        monitor_screen_and_react(root, image_file, mouse_x, mouse_y, fishing_key, search_region, status_label)
-        
-        # Inicia a atualização do progresso
-        update_progress()
-        
-        # Loop principal de carinho
-        while fishing_is_active:
-            current_time = time.time()
-            if current_time >= next_pet_time:
-                # Executa carinho
-                if pet_coordinates:
-                    pyautogui.click(pet_coordinates[0], pet_coordinates[1])
-                    status_label.config(text="Executando carinho...")
-                    time.sleep(1)
-                
-                # Define próximo carinho
-                next_pet_time = current_time + 30
-                status_label.config(text="Executando automação...")
-            
-            time.sleep(1)
-    
-    # Inicia o loop principal
     root.mainloop()
 
-if __name__ == "__main__":
-    image_file = 'exclamacao-pesca-sem-fundo.png'
+def main():
+    """Função principal que executa todas as fases do XML."""
+    # Carrega os dados dos Pokémon salvos
+    load_pokemon_data()
 
     parent_root = create_centered_parent_window()
 
-    fishing_key = get_fishing_key(parent_root)
-    if not fishing_key:
-        parent_root.destroy()
-        exit()
+    try:
+        # Fase 1: Configuração Inicial
+        if not configure_pokemon_attacks(parent_root):
+            return
+        if not configure_pet_coordinates(parent_root):
+            return
+        if not configure_fishing_key(parent_root):
+            return
+        if not configure_exclamation_region(parent_root):
+            return
+        if not configure_fishing_click(parent_root):
+            return
         
-    pet_coordinates = get_pet_coordinates(parent_root)
-
-    search_region = get_exclamation_region(parent_root)
-    if not search_region:
         parent_root.destroy()
-        exit()
+        print("Configurações salvas. A janela de controle está pronta.")
         
-    mouse_x, mouse_y = get_fishing_click_coordinates(parent_root)
-    if mouse_x is None:
+        # Fase 2: Execução
+        create_control_window()
+        
+    except Exception as e:
+        print(f"Erro na execução: {e}")
         parent_root.destroy()
-        exit()
     
-    parent_root.destroy()
-    print("Configurações salvas. A janela de controle está pronta.")
-    create_control_window(fishing_key, mouse_x, mouse_y, search_region, image_file)
+if __name__ == "__main__":
+    main()
