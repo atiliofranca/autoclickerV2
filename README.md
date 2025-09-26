@@ -1,92 +1,138 @@
 # 🎮 Automação v2.0
 
-Sistema de automação integrado com interface gráfica centralizada para scripts de automação de jogos.
+Sistema de automação simplificado com interface gráfica para scripts de automação de jogos.
 
 ## 📋 Funcionalidades
 
-- **🥚 Rachar Ovos**: Automação para quebrar ovos com movimentos aleatórios e janela de controle flutuante
+- **🥚 Rachar Ovos**: Automação completa para quebrar ovos com:
+  - Configuração simples de ponto de clique
+  - Execução de 100 ciclos com movimentos aleatórios
+  - Sistema inteligente de pausa/retomar com retomada exata
+  - Contadores em tempo real (execução e tempo restante)
+  - Janela de controle flutuante centralizada
+  - Detecção automática de monitor principal
 - **🎣 Pesca Automática**: Sistema completo de pesca com:
   - Detecção de imagem e reações automáticas
   - Sistema de carinho automático (a cada 100 segundos)
   - Sistema de ataques de Pokémon com persistência
   - Gerenciamento completo de Pokémon (cadastrar, editar, excluir, selecionar)
   - Janela de controle flutuante
-- **🖥️ Interface Unificada**: Menu principal centralizado com navegação intuitiva
-- **⚙️ Configuração Automática**: Setup automático de ambiente virtual e dependências
+- **🖥️ Interface Inteligente**: Centralização automática em qualquer configuração de monitor
+- **⚙️ Configuração Simples**: Setup manual fácil para Windows e Linux
 - **💾 Persistência de Dados**: Pokémon cadastrados são salvos automaticamente
 
 ## 🚀 Como Usar
 
-### Primeira Execução (Setup Completo)
+### Instalação e Configuração
 
 #### Windows
-1. Execute o arquivo `start_windows.bat`
-2. O script irá automaticamente:
-   - Criar um ambiente virtual Python
-   - Instalar todas as dependências necessárias
-   - Iniciar o menu principal
-   - **Manter o ambiente virtual ativo** após a execução
+1. **Instale Python 3.7+** de [python.org](https://python.org)
+2. **Abra o Prompt de Comando** como administrador
+3. **Navegue até a pasta do projeto**:
+   ```cmd
+   cd C:\caminho\para\autoclickerV2
+   ```
+4. **Crie o ambiente virtual**:
+   ```cmd
+   python -m venv venv
+   ```
+5. **Ative o ambiente virtual**:
+   ```cmd
+   venv\Scripts\activate
+   ```
+6. **Instale as dependências**:
+   ```cmd
+   pip install -r requirements.txt
+   ```
+7. **Execute o script**:
+   ```cmd
+   python rachar_egg.py
+   ```
 
-#### Linux/macOS
-1. Torne o script executável: `chmod +x start_linux.sh`
-2. Execute: `./start_linux.sh`
-3. O script irá automaticamente:
-   - Criar um ambiente virtual Python
-   - Instalar todas as dependências necessárias
-   - Iniciar o menu principal
-   - **Manter o ambiente virtual ativo** após a execução
+#### Linux (Ubuntu/Debian)
+1. **Instale Python 3 e dependências**:
+   ```bash
+   sudo apt update
+   sudo apt install python3 python3-pip python3-venv python3-tk python3-dev
+   ```
+2. **Navegue até a pasta do projeto**:
+   ```bash
+   cd /caminho/para/autoclickerV2
+   ```
+3. **Crie o ambiente virtual**:
+   ```bash
+   python3 -m venv venv
+   ```
+4. **Ative o ambiente virtual**:
+   ```bash
+   source venv/bin/activate
+   ```
+5. **Instale as dependências**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+6. **Execute o script**:
+   ```bash
+   python3 rachar_egg.py
+   ```
 
-### Execuções Subsequentes (Rápida)
+### Execuções Subsequentes
 
 #### Windows
-- Execute `run_windows.bat` para execução rápida (ambiente já configurado)
-
-#### Linux/macOS
-- Execute `./run_linux.sh` para execução rápida (ambiente já configurado)
-
-### Execução Manual
-Se preferir executar manualmente:
-
-```bash
-# Criar ambiente virtual
-python -m venv venv
-
-# Ativar ambiente virtual
-# Windows:
+```cmd
+cd C:\caminho\para\autoclickerV2
 venv\Scripts\activate
-# Linux/macOS:
+python rachar_egg.py
+```
+
+#### Linux
+```bash
+cd /caminho/para/autoclickerV2
 source venv/bin/activate
-
-# Instalar dependências
-pip install -r requirements.txt
-
-# Executar aplicação
-python menu_principal.py
+python3 rachar_egg.py
 ```
 
 ## 📦 Dependências
 
 - **pyautogui**: Automação de mouse e teclado
-- **screeninfo**: Detecção de monitores e resolução
 - **Pillow**: Processamento de imagens
 - **tkinter**: Interface gráfica (incluído com Python)
 
 ## 🎯 Como Funciona
 
-### Menu Principal
-- Interface centralizada com opções para cada script
-- Centralização automática da janela na tela
-- Navegação intuitiva entre diferentes funcionalidades
+### Rachar Ovos - Funcionalidades Principais
 
-### Rachar Ovos
-- Configuração de ponto de clique através de popup
-- Execução de 100 ciclos de automação
-- Movimentos aleatórios do personagem
-- Tempos de espera variáveis entre 183-203 segundos
-- **Janela de controle flutuante** com:
-  - Contador de execução em tempo real
-  - Tempo restante para próxima execução
-  - Botões para pausar, retomar e parar
+#### 🎮 **Interface Simplificada**
+- **Sem Menu Centralizado**: Executa diretamente o script de rachar ovos
+- **Configuração Única**: Apenas uma janela de configuração de ponto de clique
+- **Janela de Controle Flutuante**: Sempre visível durante a execução
+
+#### ⚙️ **Sistema de Controle Inteligente**
+- **Botão Único**: Alterna entre "Iniciar", "Pausar" e "Retomar"
+- **Estados do Botão**:
+  - **▶️ Iniciar** (verde): Inicia a automação do zero
+  - **⏸️ Pausar** (laranja): Pausa durante contagem de segundos (desabilitado durante movimento)
+  - **▶️ Retomar** (verde): Retoma exatamente do ponto onde foi pausado
+
+#### 📊 **Contadores em Tempo Real**
+- **Contador de Execução**: Mostra "Execução: X/100" em tempo real
+- **Contador de Tempo**: Mostra "Tempo restante: Xs" durante a contagem
+- **Status Inteligente**: 
+  - Durante execução: mostra progresso atual
+  - Durante pausa: mostra execução e tempo exatos onde parou
+  - Antes de iniciar: mostra "0/100" e "---"
+
+#### 🖥️ **Centralização Automática**
+- **Detecção Inteligente**: Detecta automaticamente o monitor principal
+- **Pop-ups**: Centralizados no monitor principal
+- **Janela Suspensa**: Posicionada no quadrante inferior esquerdo do monitor principal
+- **Compatibilidade Universal**: Funciona em qualquer configuração de monitor
+
+#### 🔄 **Sistema de Pausa/Retomar Avançado**
+- **Pausa Precisa**: Pausa exatamente no segundo atual da contagem
+- **Retomada Exata**: Continua exatamente de onde parou
+- **Estado Persistente**: Mantém informações de execução e tempo durante pausa
+- **Múltiplas Pausas**: Permite pausar e retomar quantas vezes necessário
 
 ### Pesca Automática
 - **Configuração Completa**:
@@ -135,70 +181,64 @@ Se você encontrar erros de compilação com o Pillow, o arquivo `requirements.t
 sudo apt install python3-tk python3-dev
 ```
 
-### Erro de Centralização
-- Verifique se o `screeninfo` está instalado corretamente
-- Em sistemas multi-monitor, certifique-se de que o monitor principal está configurado
-
 ### Erro "ModuleNotFoundError"
 Se você receber erros de módulos não encontrados:
 1. Certifique-se de que o ambiente virtual está ativado
 2. Execute: `pip install -r requirements.txt`
 3. Se ainda houver problemas, use: `pip install --upgrade pip`
 
-### Erro de Política de Execução do PowerShell (Windows)
-Se você receber o seguinte erro ao executar os scripts `.bat`:
+### Segmentation Fault (Linux)
+Se você encontrar erros de segmentation fault:
+1. Certifique-se de que todas as dependências estão instaladas
+2. Use Python 3.x em vez de Python 2.x
+3. Execute: `python3 rachar_egg.py` em vez de `python rachar_egg.py`
 
-```
-& : O arquivo C:caminho\do\arquivo não pode ser carregado porque a execução de scripts foi desabilitada neste sistema. Para obter mais informações, 
-consulte about_Execution_Policies em https://go.microsoft.com/fwlink/?LinkID=135170.
-No linha:1 caractere:3
-+ & C:caminho\do\arquivo
-+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-+ CategoryInfo          : ErrodeSegurança: (:) [], PSSecurityException
-+ FullyQualifiedErrorId : UnauthorizedAccess
-```
-
-**Solução:**
-1. Abra o PowerShell **sem ser administrador**
-2. Execute o comando:
-   ```powershell
-   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-   ```
-3. Confirme com `Y` quando solicitado
-4. Agora você pode executar os scripts `.bat` normalmente
-
-**Nota:** Este comando permite a execução de scripts assinados remotamente apenas para o usuário atual, mantendo a segurança do sistema.
+### Problemas de Centralização
+- O sistema detecta automaticamente o monitor principal
+- Funciona em configurações de monitor único ou múltiplos
+- Se houver problemas, verifique se o cursor está no monitor desejado
 
 ## 📁 Estrutura do Projeto
 
 ```
-autoclicker-2.0/
-├── menu_principal.py      # Menu principal integrado
-├── rachar_egg.py          # Script de rachar ovos com controle flutuante
-├── pesca.py               # Script de pesca com controle flutuante
+autoclickerV2/
+├── rachar_egg.py          # Script principal de rachar ovos
+├── pesca.py               # Script de pesca automática
+├── menu_principal.py      # Menu principal (opcional)
 ├── requirements.txt        # Dependências do projeto
-├── start_windows.bat      # Setup completo Windows (mantém venv ativo)
-├── start_linux.sh         # Setup completo Linux (mantém venv ativo)
-├── run_windows.bat        # Execução rápida Windows
-├── run_linux.sh           # Execução rápida Linux
+├── pokemon_data.json      # Dados dos Pokémon (gerado automaticamente)
 ├── exclamacao-pesca-sem-fundo.png  # Imagem para detecção
 └── README.md              # Este arquivo
 ```
 
-## 🎮 Uso dos Scripts
+## 🎮 Uso do Script Rachar Ovos
 
-### Rachar Ovos
-1. Execute o menu principal
-2. Clique em "🥚 Rachar Ovos"
-3. Configure o ponto de clique quando solicitado
-4. Use a janela de controle flutuante para:
-   - Acompanhar o progresso em tempo real
-   - Pausar/retomar a automação quando necessário (o sistema de pausa funciona apenas quando os segundos entre uma execução e outra estão sendo contados)
-   - Parar completamente se necessário
-5. Aguarde a conclusão das 100 execuções
+### Passo a Passo Completo
+
+1. **Execute o script**:
+   - Windows: `python rachar_egg.py`
+   - Linux: `python3 rachar_egg.py`
+
+2. **Configure o ponto de clique**:
+   - Clique em "OK" na janela "Configurar Clique"
+   - Posicione o mouse no local desejado
+   - Aguarde 5 segundos para captura automática
+   - Confirme as coordenadas na janela "Ponto Salvo"
+
+3. **Use a janela de controle**:
+   - **Iniciar**: Clique em "▶️ Iniciar" para começar
+   - **Pausar**: Durante contagem de segundos, clique em "⏸️ Pausar"
+   - **Retomar**: Clique em "▶️ Retomar" para continuar exatamente de onde parou
+   - **Acompanhar**: Veja execução atual e tempo restante em tempo real
+
+4. **Funcionamento**:
+   - Executa 100 ciclos de automação
+   - Cada ciclo: clique + movimentos aleatórios + espera (183-203s)
+   - Botão fica desabilitado durante movimentos do personagem
+   - Pode pausar/retomar quantas vezes necessário
 
 ### Pesca Automática
-1. Execute o menu principal
+1. Execute o menu principal: `python menu_principal.py`
 2. Clique em "🎣 Pesca Automática"
 3. Configure a tecla de atalho (F1-F12)
 4. Configure o ponto de carinho (opcional)
@@ -208,10 +248,10 @@ autoclicker-2.0/
 
 ## 📝 Notas Importantes
 
-- **Backup**: Sempre faça backup de suas configurações importantes
 - **Segurança**: Os scripts são seguros e não modificam arquivos do sistema
 - **Performance**: Para melhor performance, feche outros programas desnecessários
 - **Compatibilidade**: Testado em Windows 10/11 e Ubuntu 20.04+
+- **Portabilidade**: Funciona em qualquer configuração de monitor automaticamente
 
 ## 🤝 Suporte
 
@@ -220,6 +260,7 @@ Para problemas ou sugestões, verifique:
 2. Se o Python está na versão correta (3.7+)
 3. Se as permissões de automação estão habilitadas
 4. Se a resolução da tela é compatível
+5. Se o ambiente virtual está ativado
 
 ---
 
